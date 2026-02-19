@@ -257,40 +257,53 @@ public class HomeTabFragment extends Fragment {
 
     /**
      * Get the device's LAN IPv4 address using a multi-strategy approach.
-     * This must work reliably even when our own VPN is active — the VPN
-     * obscures the real Wi-Fi/Ethernet IP in several Android APIs.
+     * Must work reliably across all connectivity modes — Wi-Fi client,
+     * Wi-Fi hotspot, USB tethering, Ethernet — even when our own VPN
+     * service is the active network and obscures the real interface.
      *
      * Strategy 1 (API 23+): ConnectivityManager — iterate ALL networks
-     *   looking for TRANSPORT_WIFI or TRANSPORT_ETHERNET (skip VPN/cellular),
-     *   then read LinkProperties for a site-local IPv4 address.
+     *   looking for Wi-Fi or Ethernet (skip VPN/cellular), then read
+     *   LinkProperties for a site-local IPv4 address. Doesn't cover
+     *   hotspot because Android doesn't expose the AP as a "network".
      *
      * Strategy 2 (all levels): NetworkInterface enumeration — walk every
-     *   interface, skip known non-LAN names (tun, ppp, rmnet, lo, dummy,
-     *   p2p, wigig), and return the first site-local IPv4 address.
+     *   interface, skip known virtual/tunnel names, prioritize known
+     *   LAN and hotspot interface names (wlan, eth, ap, swlan, softap,
+     *   rndis, usb, bridge). Works for Wi-Fi, hotspot, USB tethering.
      *
      * Strategy 3 (all levels, deprecated but functional through API 34+):
-     *   WifiManager.getConnectionInfo().getIpAddress() — returns the raw
-     *   Wi-Fi IPv4 even with VPN active because it reads from the Wi-Fi
-     *   HAL directly, not from the routing table.
+     *   WifiManager.getConnectionInfo().getIpAddress() — reads the Wi-Fi
+     *   client IP directly from the HAL, bypassing VPN. Only works when
+     *   the phone is connected to Wi-Fi as a client.
+     *
+     * Strategy 4 (all levels): DatagramSocket probe — open a UDP socket
+     *   toward a private IP address and read back the local address the
+     *   OS chose. Because our VPN excludes RFC 1918 ranges from its
+     *   routes, the socket binds to the real physical interface. This is
+     *   the universal last resort that works for any connectivity mode.
      *
      * Every strategy is tried in order; the first non-null result wins.
      */
     private static String getLanIpAddress(Context context) {
-        // Strategy 1: ConnectivityManager + LinkProperties (most authoritative)
+        // Strategy 1: ConnectivityManager + LinkProperties (most authoritative for Wi-Fi/Ethernet)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             String ip = getLanIpFromConnectivityManager(context);
             if (ip != null) return ip;
         }
 
-        // Strategy 2: NetworkInterface enumeration
+        // Strategy 2: NetworkInterface enumeration (covers hotspot, USB tethering, etc.)
         String ip = getLanIpFromNetworkInterfaces();
         if (ip != null) return ip;
 
-        // Strategy 3: WifiManager — deprecated but still functional on all
-        // API levels through at least API 34. This is our most reliable
-        // fallback because it reads the Wi-Fi IP directly from the HAL,
-        // bypassing any VPN routing interference.
-        return getLanIpFromWifiManager(context);
+        // Strategy 3: WifiManager — reads Wi-Fi client IP from HAL, bypasses VPN.
+        // Deprecated but still works through at least API 34.
+        ip = getLanIpFromWifiManager(context);
+        if (ip != null) return ip;
+
+        // Strategy 4: DatagramSocket probe — universal fallback for any connectivity.
+        // Since our VPN excludes private ranges, a UDP socket aimed at a private IP
+        // binds to the real physical interface instead of the VPN tunnel.
+        return getLanIpFromSocketProbe();
     }
 
     /**
@@ -298,6 +311,9 @@ public class HomeTabFragment extends Fragment {
      * Wi-Fi or Ethernet transport that is NOT a VPN. When our VPN is active,
      * getActiveNetwork() returns the VPN network, so we must iterate
      * getAllNetworks() to find the underlying physical network.
+     *
+     * This doesn't find hotspot interfaces — Android doesn't expose the
+     * local AP as a Network object in ConnectivityManager.
      */
     @android.annotation.TargetApi(Build.VERSION_CODES.M)
     private static String getLanIpFromConnectivityManager(Context context) {
@@ -338,21 +354,29 @@ public class HomeTabFragment extends Fragment {
     /**
      * Strategy 2: Enumerate all NetworkInterfaces and return the first
      * site-local IPv4 address on a physical-looking interface. We skip
-     * known virtual/tunnel interface name prefixes.
+     * known virtual/tunnel interface name prefixes and prioritize known
+     * LAN and hotspot interface names.
+     *
+     * Known hotspot/tethering interface names across Android OEMs:
+     *   ap0, swlan0, softap0, wlan1 — Wi-Fi hotspot
+     *   rndis0 — USB tethering
+     *   usb0 — USB tethering (some OEMs)
+     *   bridge0 — bridged tethering
      */
     private static String getLanIpFromNetworkInterfaces() {
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             if (interfaces == null) return null;
 
-            // Collect candidates — prefer wlan/eth over others
             String otherCandidate = null;
 
             for (NetworkInterface ni : Collections.list(interfaces)) {
                 if (ni.isLoopback() || !ni.isUp()) continue;
                 String name = ni.getName().toLowerCase();
 
-                // Skip known non-LAN interfaces
+                // Skip known non-LAN interfaces: VPN tunnels, cellular,
+                // loopback, dummy, Wi-Fi Direct, WiGig, CLAT (464XLAT),
+                // and v4-rmnet (VPN cellular offload)
                 if (name.startsWith("tun") || name.startsWith("ppp") ||
                         name.startsWith("rmnet") || name.startsWith("lo") ||
                         name.startsWith("dummy") || name.startsWith("p2p") ||
@@ -366,9 +390,13 @@ public class HomeTabFragment extends Fragment {
                             !addr.isLoopbackAddress() &&
                             addr.isSiteLocalAddress()) {
                         String ip = addr.getHostAddress();
+                        // High-confidence LAN interfaces (Wi-Fi client, Ethernet)
+                        // and hotspot/tethering interfaces — return immediately
                         if (name.startsWith("wlan") || name.startsWith("eth") ||
-                                name.startsWith("en")) {
-                            // High-confidence LAN interface — return immediately
+                                name.startsWith("en") ||
+                                name.startsWith("ap") || name.startsWith("swlan") ||
+                                name.startsWith("softap") || name.startsWith("rndis") ||
+                                name.startsWith("usb") || name.startsWith("bridge")) {
                             return ip;
                         }
                         if (otherCandidate == null) {
@@ -378,7 +406,6 @@ public class HomeTabFragment extends Fragment {
                 }
             }
 
-            // Return best candidate found
             return otherCandidate;
         } catch (SocketException ignored) {}
         return null;
@@ -389,7 +416,10 @@ public class HomeTabFragment extends Fragment {
      * IPv4 address directly from the Wi-Fi HAL, so it works correctly even
      * when a VPN is the active network. The API is deprecated since API 31
      * but remains functional and returns correct values through at least
-     * Android 14 (API 34). This is the most reliable single-call fallback.
+     * Android 14 (API 34).
+     *
+     * Only works when the phone is connected to Wi-Fi as a client — returns
+     * 0 when using mobile data with hotspot.
      */
     @SuppressWarnings("deprecation")
     private static String getLanIpFromWifiManager(Context context) {
@@ -408,6 +438,43 @@ public class HomeTabFragment extends Fragment {
             // SecurityException on some OEMs without ACCESS_WIFI_STATE
             return null;
         }
+    }
+
+    /**
+     * Strategy 4: Open a UDP socket aimed at a private IP and read back the
+     * local address the OS routing table selected. No packets are actually
+     * sent — connect() on a DatagramSocket just sets the default destination
+     * and causes the OS to bind the socket to the appropriate local interface.
+     *
+     * This works because our VPN excludes RFC 1918 private ranges from its
+     * routes. When the OS resolves the route to 192.168.255.255 (or any
+     * private IP), it picks the real physical interface — Wi-Fi, hotspot,
+     * Ethernet, or USB tethering — instead of the VPN tunnel.
+     *
+     * This is the universal fallback that should work for any connectivity
+     * mode where the device has a private LAN address.
+     */
+    private static String getLanIpFromSocketProbe() {
+        try {
+            java.net.DatagramSocket socket = new java.net.DatagramSocket();
+            try {
+                // Connect to a private IP — no actual packet is sent. We use
+                // 192.168.255.255 because it's in the private range our VPN
+                // excludes, so the OS routes it through the real interface.
+                socket.connect(InetAddress.getByName("192.168.255.255"), 1);
+                InetAddress localAddr = socket.getLocalAddress();
+                if (localAddr == null || localAddr.isAnyLocalAddress() ||
+                        localAddr.isLoopbackAddress()) {
+                    return null;
+                }
+                if (localAddr instanceof Inet4Address && localAddr.isSiteLocalAddress()) {
+                    return localAddr.getHostAddress();
+                }
+            } finally {
+                socket.close();
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private void startPulseAnimation() {
