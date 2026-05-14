@@ -143,6 +143,7 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
     public static final String DATA_UNSAFE_TRAFFIC_ACTION_URLS_LIST = "dataUnsafeTrafficActionUrls";
     public static final String DATA_NFC_CONNECTION_INFO_EXCHANGE = "dataNfcConnectionInfoExchange";
     static final String DATA_TUNNEL_STATE_SHARE_PROXY_ON_NETWORK = "shareProxyOnNetwork";
+    private static final int MAX_CUSTOM_CDN_FRONTING_IP_ADDRESSES = 32;
 
     void updateNotifications() {
         postServiceNotification(false, m_tunnelState.networkConnectionState);
@@ -152,7 +153,9 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
     static class Config {
         String egressRegion = PsiphonConstants.REGION_CODE_ANY;
         boolean disableTimeouts = false;
-        String protocolSelection = "auto"; // "auto", "conduit", or "direct"
+        String protocolSelection = "auto"; // "auto", "conduit", "cdn_fronting", or "direct"
+        String cdnFrontingCustomIpList = "";
+        String cdnFrontingCustomSni = "";
         boolean beastMode = true; // aggressive establishment: try all protocols on all servers
         String conduitMode = "auto"; // "auto", "shirokhorshid", or "public"
         int conduitTimeoutSeconds = 180; // fallback timeout for auto conduit mode
@@ -568,6 +571,12 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
             tunnelConfig.protocolSelection = multiProcessPreferences
                     .getString(getContext().getString(R.string.protocolSelectionPreference),
                             "auto");
+            tunnelConfig.cdnFrontingCustomIpList = multiProcessPreferences
+                    .getString(getContext().getString(R.string.cdnFrontingCustomIpListPreference),
+                            "");
+            tunnelConfig.cdnFrontingCustomSni = multiProcessPreferences
+                    .getString(getContext().getString(R.string.cdnFrontingCustomSniPreference),
+                            "");
             tunnelConfig.beastMode = multiProcessPreferences
                     .getBoolean(getContext().getString(R.string.beastModePreference),
                             true);
@@ -1400,6 +1409,255 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
      * @param tempTunnelName   null if not a temporary tunnel. If set, must be a valid to use in file path.
      * @return JSON string of config. null on error.
      */
+    private static JSONArray jsonArray(String... values) {
+        JSONArray array = new JSONArray();
+        for (String value : values) {
+            array.put(value);
+        }
+        return array;
+    }
+
+    private static JSONObject makeCdnFrontingOverride(
+            String overrideID,
+            JSONArray matchFrontingProviderIDRegexes,
+            JSONArray matchDialAddressRegexes,
+            String dialAddress,
+            String sniServerName,
+            JSONArray verifyServerNames,
+            JSONArray alpnProtocols) throws JSONException {
+        JSONObject override = new JSONObject();
+        override.put("OverrideID", overrideID);
+        if (matchFrontingProviderIDRegexes != null) {
+            override.put("MatchFrontingProviderIDRegexes", matchFrontingProviderIDRegexes);
+        }
+        if (matchDialAddressRegexes != null) {
+            override.put("MatchDialAddressRegexes", matchDialAddressRegexes);
+        }
+        override.put("DialAddresses", jsonArray(dialAddress));
+        override.put("SNIServerName", sniServerName);
+        override.put("VerifyServerNames", verifyServerNames);
+        override.put("ALPNProtocols", alpnProtocols);
+        override.put("TLSProfile", "Chrome-83");
+        return override;
+    }
+
+    private static JSONArray makeEdgeVerifyServerNames(String ipAddress, String sniServerName) {
+        JSONArray verifyServerNames = new JSONArray();
+        Set<String> addedNames = new HashSet<>();
+
+        putUniqueString(verifyServerNames, addedNames, sniServerName);
+        putUniqueString(verifyServerNames, addedNames, ipAddress);
+        putUniqueString(verifyServerNames, addedNames, "a248.e.akamai.net");
+        putUniqueString(verifyServerNames, addedNames, "a.akamaized.net");
+        putUniqueString(verifyServerNames, addedNames, "a.akamaized-staging.net");
+        putUniqueString(verifyServerNames, addedNames, "a.akamaihd.net");
+        putUniqueString(verifyServerNames, addedNames, "a.akamaihd-staging.net");
+        putUniqueString(verifyServerNames, addedNames, "www.akamai.com");
+
+        return verifyServerNames;
+    }
+
+    private static void putUniqueString(JSONArray array, Set<String> values, String value) {
+        if (!TextUtils.isEmpty(value) && values.add(value)) {
+            array.put(value);
+        }
+    }
+
+    private static JSONObject makeEdgeCdnFrontingOverride(
+            String overrideID,
+            String ipAddress,
+            String customSni) throws JSONException {
+
+        String sniServerName = TextUtils.isEmpty(customSni) ? ipAddress : customSni;
+
+        return makeCdnFrontingOverride(
+                overrideID,
+                null,
+                jsonArray(".*"),
+                ipAddress,
+                sniServerName,
+                makeEdgeVerifyServerNames(ipAddress, sniServerName),
+                jsonArray("http/1.1"));
+    }
+
+    private static void putEdgeCdnFrontingOverride(
+            JSONArray overrides,
+            Set<String> dialAddresses,
+            String overrideID,
+            String ipAddress,
+            String customSni) throws JSONException {
+        if (dialAddresses.add(ipAddress)) {
+            overrides.put(makeEdgeCdnFrontingOverride(overrideID, ipAddress, customSni));
+        }
+    }
+
+    private static List<String> parseCdnFrontingCustomIpList(String customIpList) {
+        ArrayList<String> ipAddresses = new ArrayList<>();
+        if (TextUtils.isEmpty(customIpList)) {
+            return ipAddresses;
+        }
+
+        Set<String> seen = new HashSet<>();
+        for (String entry : customIpList.split("[\\s,;]+")) {
+            String ipAddress = entry.trim();
+            if (ipAddress.isEmpty() || !isValidIPv4Address(ipAddress)) {
+                continue;
+            }
+            if (seen.add(ipAddress)) {
+                ipAddresses.add(ipAddress);
+                if (ipAddresses.size() >= MAX_CUSTOM_CDN_FRONTING_IP_ADDRESSES) {
+                    break;
+                }
+            }
+        }
+
+        return ipAddresses;
+    }
+
+    private static String normalizeCdnFrontingCustomSni(String customSni) {
+        if (TextUtils.isEmpty(customSni)) {
+            return "";
+        }
+        String sni = customSni.trim();
+        if (!isValidHostname(sni)) {
+            return "";
+        }
+        return sni;
+    }
+
+    private static boolean isValidIPv4Address(String ipAddress) {
+        String[] parts = ipAddress.split("\\.", -1);
+        if (parts.length != 4) {
+            return false;
+        }
+
+        for (String part : parts) {
+            if (part.isEmpty() || part.length() > 3) {
+                return false;
+            }
+            for (int i = 0; i < part.length(); i++) {
+                if (!Character.isDigit(part.charAt(i))) {
+                    return false;
+                }
+            }
+            try {
+                int value = Integer.parseInt(part);
+                if (value < 0 || value > 255) {
+                    return false;
+                }
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean isValidHostname(String hostname) {
+        if (TextUtils.isEmpty(hostname) || hostname.length() > 253 ||
+                isValidIPv4Address(hostname)) {
+            return false;
+        }
+
+        String normalizedHostname = hostname;
+        if (normalizedHostname.endsWith(".")) {
+            normalizedHostname = normalizedHostname.substring(0, normalizedHostname.length() - 1);
+        }
+        if (normalizedHostname.isEmpty()) {
+            return false;
+        }
+
+        String[] labels = normalizedHostname.split("\\.", -1);
+        for (String label : labels) {
+            if (label.isEmpty() || label.length() > 63 ||
+                    label.startsWith("-") || label.endsWith("-")) {
+                return false;
+            }
+            for (int i = 0; i < label.length(); i++) {
+                char character = label.charAt(i);
+                if (!Character.isLetterOrDigit(character) && character != '-') {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static JSONArray makeCdnFrontingDialOverrides(
+            String customIpList,
+            String customSni) throws JSONException {
+        JSONArray overrides = new JSONArray();
+        Set<String> edgeDialAddresses = new HashSet<>();
+        String edgeSni = normalizeCdnFrontingCustomSni(customSni);
+
+        JSONArray fastlyVerifyServerNames = jsonArray(
+                "www.python.org",
+                "pypi.org",
+                "fastly.com",
+                "www.fastly.com",
+                "developer.fastly.com",
+                "githubassets.com",
+                "github.com",
+                "github.io",
+                "githubusercontent.com");
+        JSONArray fastlyALPNProtocols = jsonArray("h2", "http/1.1");
+
+        overrides.put(makeCdnFrontingOverride(
+                "fastly-provider",
+                jsonArray("(?i)fastly"),
+                null,
+                "pypi.org",
+                "pypi.org",
+                fastlyVerifyServerNames,
+                fastlyALPNProtocols));
+        overrides.put(makeCdnFrontingOverride(
+                "fastly-address",
+                null,
+                jsonArray("(?i)(fastly|pypi|python|github)"),
+                "pypi.org",
+                "pypi.org",
+                fastlyVerifyServerNames,
+                fastlyALPNProtocols));
+
+        int customIndex = 1;
+        for (String ipAddress : parseCdnFrontingCustomIpList(customIpList)) {
+            putEdgeCdnFrontingOverride(
+                    overrides, edgeDialAddresses, "edge-custom-" + customIndex, ipAddress, edgeSni);
+            customIndex++;
+        }
+
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-a-1", "23.215.0.206", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-a-2", "23.215.0.203", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-b-1", "23.212.250.91", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-b-2", "23.212.250.78", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-c-1", "23.12.147.13", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-c-2", "23.12.147.29", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-d-1", "23.73.207.8", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-d-2", "23.73.207.15", edgeSni);
+        putEdgeCdnFrontingOverride(
+                overrides, edgeDialAddresses, "edge-original", "92.123.102.43", edgeSni);
+
+        return overrides;
+    }
+
+    private static void putCdnFrontingConfig(
+            JSONObject json,
+            Config tunnelConfig) throws JSONException {
+        json.put("FrontedMeekDialOverrides", makeCdnFrontingDialOverrides(
+                tunnelConfig.cdnFrontingCustomIpList,
+                tunnelConfig.cdnFrontingCustomSni));
+        json.put("FrontedMeekDialOverridesProbability", 1.0);
+    }
+
     public static String buildTunnelCoreConfig(
             Context context,
             Config tunnelConfig,
@@ -1502,9 +1760,17 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                 json.put("NetworkLatencyMultiplierLambda", 0.1);
             }
 
-            // Protocol selection: auto, conduit, or direct
+            // Protocol selection: auto, conduit, CDN fronting, or direct
             String protocolSelection = tunnelConfig.protocolSelection;
             MyLog.i("ProtocolSelection", "mode", protocolSelection);
+
+            boolean enableCdnFronting =
+                    "auto".equals(protocolSelection) ||
+                    "direct".equals(protocolSelection) ||
+                    "cdn_fronting".equals(protocolSelection);
+            if (enableCdnFronting) {
+                putCdnFrontingConfig(json, tunnelConfig);
+            }
             
             if ("conduit".equals(protocolSelection)) {
                 // Conduit: only use inproxy protocols
@@ -1570,15 +1836,22 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                         MyLog.i("ConduitConfig", "rejectCountries", "disabled");
                     }
                 }
+            } else if ("cdn_fronting".equals(protocolSelection)) {
+                JSONArray limitProtocols = new JSONArray();
+                limitProtocols.put("FRONTED-MEEK-CDN-OSSH");
+                json.put("LimitTunnelProtocols", limitProtocols);
+                json.put("DisableTactics", true);
             } else if ("direct".equals(protocolSelection)) {
-                // Direct: only use non-inproxy, non-meek protocols
+                // Direct: use non-inproxy direct protocols plus the CDN-fronted meek fallback.
                 JSONArray limitProtocols = new JSONArray();
                 limitProtocols.put("SSH");
                 limitProtocols.put("OSSH");
                 limitProtocols.put("TLS-OSSH");
                 limitProtocols.put("QUIC-OSSH");
                 limitProtocols.put("SHADOWSOCKS-OSSH");
+                limitProtocols.put("FRONTED-MEEK-CDN-OSSH");
                 json.put("LimitTunnelProtocols", limitProtocols);
+                json.put("DisableTactics", true);
             }
             // For "auto" mode, don't set LimitTunnelProtocols - let Psiphon choose
 

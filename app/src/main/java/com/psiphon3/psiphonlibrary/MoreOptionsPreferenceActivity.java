@@ -24,7 +24,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
 import android.text.SpannableString;
+import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.widget.TextView;
@@ -32,6 +34,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.CheckBoxPreference;
+import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
@@ -62,6 +65,8 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
     public static class MoreOptionsPreferenceFragment extends PsiphonPreferenceFragmentCompat
             implements SharedPreferences.OnSharedPreferenceChangeListener {
         ListPreference mLanguageSelector;
+        EditTextPreference mCdnFrontingCustomIpList;
+        EditTextPreference mCdnFrontingCustomSni;
 
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             super.onCreatePreferences(savedInstanceState, rootKey);
@@ -124,6 +129,49 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
             protocolSelectionList.setValue(protocolValue);
             updateProtocolSelectionSummary(protocolSelectionList, protocolValue);
 
+            mCdnFrontingCustomIpList = (EditTextPreference) preferences
+                    .findPreference(getString(R.string.cdnFrontingCustomIpListPreference));
+            if (mCdnFrontingCustomIpList != null) {
+                String customIpList = preferenceGetter.getString(
+                        getString(R.string.cdnFrontingCustomIpListPreference), "");
+                mCdnFrontingCustomIpList.setText(customIpList);
+                mCdnFrontingCustomIpList.setOnBindEditTextListener(editText -> {
+                    editText.setSingleLine(false);
+                    editText.setMinLines(3);
+                    editText.setInputType(InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                            | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                    editText.setSelection(editText.length());
+                });
+                updateCdnFrontingCustomIpSummary(mCdnFrontingCustomIpList, customIpList);
+                mCdnFrontingCustomIpList.setOnPreferenceChangeListener((preference, newValue) -> {
+                    updateCdnFrontingCustomIpSummary(
+                            (EditTextPreference) preference, (String) newValue);
+                    return true;
+                });
+            }
+
+            mCdnFrontingCustomSni = (EditTextPreference) preferences
+                    .findPreference(getString(R.string.cdnFrontingCustomSniPreference));
+            if (mCdnFrontingCustomSni != null) {
+                String customSni = preferenceGetter.getString(
+                        getString(R.string.cdnFrontingCustomSniPreference), "");
+                mCdnFrontingCustomSni.setText(customSni);
+                mCdnFrontingCustomSni.setOnBindEditTextListener(editText -> {
+                    editText.setSingleLine(true);
+                    editText.setInputType(InputType.TYPE_CLASS_TEXT
+                            | InputType.TYPE_TEXT_VARIATION_URI
+                            | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                    editText.setSelection(editText.length());
+                });
+                updateCdnFrontingCustomSniSummary(mCdnFrontingCustomSni, customSni);
+                mCdnFrontingCustomSni.setOnPreferenceChangeListener((preference, newValue) -> {
+                    updateCdnFrontingCustomSniSummary(
+                            (EditTextPreference) preference, (String) newValue);
+                    return true;
+                });
+            }
+
             // Beast mode (aggressive establishment)
             SwitchPreference beastModeSwitch =
                     (SwitchPreference) preferences.findPreference(getString(R.string.beastModePreference));
@@ -132,7 +180,13 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
                         preferenceGetter.getBoolean(getString(R.string.beastModePreference), true));
             }
 
-            // Set initial conduit category visibility based on current protocol
+            // Set initial protocol-specific category visibility.
+            PreferenceCategory cdnFrontingCategory =
+                    (PreferenceCategory) preferences.findPreference("cdnFrontingCategory");
+            if (cdnFrontingCategory != null) {
+                cdnFrontingCategory.setVisible(isCdnFrontingRelevantProtocol(protocolValue));
+            }
+
             PreferenceCategory conduitCategory =
                     (PreferenceCategory) preferences.findPreference("conduitCategory");
             if (conduitCategory != null) {
@@ -142,6 +196,9 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
             protocolSelectionList.setOnPreferenceChangeListener((preference, newValue) -> {
                 String protocol = (String) newValue;
                 updateProtocolSelectionSummary((ListPreference) preference, protocol);
+                if (cdnFrontingCategory != null) {
+                    cdnFrontingCategory.setVisible(isCdnFrontingRelevantProtocol(protocol));
+                }
                 // Show conduit settings only when protocol is auto or conduit
                 if (conduitCategory != null) {
                     conduitCategory.setVisible(isConduitRelevantProtocol(protocol));
@@ -211,6 +268,9 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
                 case "conduit":
                     preference.setSummary(getString(R.string.protocolSelectionSummaryConduit));
                     break;
+                case "cdn_fronting":
+                    preference.setSummary(getString(R.string.protocolSelectionSummaryCdnFronting));
+                    break;
                 case "direct":
                     preference.setSummary(getString(R.string.protocolSelectionSummaryDirect));
                     break;
@@ -223,6 +283,122 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
 
         private boolean isConduitRelevantProtocol(String protocol) {
             return "auto".equals(protocol) || "conduit".equals(protocol);
+        }
+
+        private boolean isCdnFrontingRelevantProtocol(String protocol) {
+            return "auto".equals(protocol) ||
+                    "direct".equals(protocol) ||
+                    "cdn_fronting".equals(protocol);
+        }
+
+        private void updateCdnFrontingCustomIpSummary(EditTextPreference preference, String value) {
+            int count = countCdnFrontingIpEntries(value);
+            if (count > 0) {
+                preference.setSummary(getString(
+                        R.string.cdnFrontingCustomIpListPreferenceSummaryConfigured, count));
+            } else {
+                preference.setSummary(getString(R.string.cdnFrontingCustomIpListPreferenceSummary));
+            }
+        }
+
+        private int countCdnFrontingIpEntries(String value) {
+            if (TextUtils.isEmpty(value)) {
+                return 0;
+            }
+            int count = 0;
+            for (String entry : value.split("[\\s,;]+")) {
+                if (isValidIPv4Address(entry.trim())) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private void updateCdnFrontingCustomSniSummary(EditTextPreference preference, String value) {
+            String sni = normalizeCdnFrontingCustomSni(value);
+            if (TextUtils.isEmpty(sni)) {
+                if (TextUtils.isEmpty(value) || TextUtils.isEmpty(value.trim())) {
+                    preference.setSummary(getString(R.string.cdnFrontingCustomSniPreferenceSummary));
+                } else {
+                    preference.setSummary(getString(R.string.cdnFrontingCustomSniPreferenceSummaryInvalid));
+                }
+                return;
+            }
+            preference.setSummary(getString(
+                    R.string.cdnFrontingCustomSniPreferenceSummaryConfigured, sni));
+        }
+
+        private String normalizeCdnFrontingCustomSni(String value) {
+            if (TextUtils.isEmpty(value)) {
+                return "";
+            }
+            String sni = value.trim();
+            if (!isValidHostname(sni)) {
+                return "";
+            }
+            return sni;
+        }
+
+        private boolean isValidIPv4Address(String ipAddress) {
+            if (TextUtils.isEmpty(ipAddress)) {
+                return false;
+            }
+            String[] parts = ipAddress.split("\\.", -1);
+            if (parts.length != 4) {
+                return false;
+            }
+
+            for (String part : parts) {
+                if (part.isEmpty() || part.length() > 3) {
+                    return false;
+                }
+                for (int i = 0; i < part.length(); i++) {
+                    if (!Character.isDigit(part.charAt(i))) {
+                        return false;
+                    }
+                }
+                try {
+                    int parsed = Integer.parseInt(part);
+                    if (parsed < 0 || parsed > 255) {
+                        return false;
+                    }
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private boolean isValidHostname(String hostname) {
+            if (TextUtils.isEmpty(hostname) || hostname.length() > 253 ||
+                    isValidIPv4Address(hostname)) {
+                return false;
+            }
+
+            String normalizedHostname = hostname;
+            if (normalizedHostname.endsWith(".")) {
+                normalizedHostname = normalizedHostname.substring(0, normalizedHostname.length() - 1);
+            }
+            if (normalizedHostname.isEmpty()) {
+                return false;
+            }
+
+            String[] labels = normalizedHostname.split("\\.", -1);
+            for (String label : labels) {
+                if (label.isEmpty() || label.length() > 63 ||
+                        label.startsWith("-") || label.endsWith("-")) {
+                    return false;
+                }
+                for (int i = 0; i < label.length(); i++) {
+                    char character = label.charAt(i);
+                    if (!Character.isLetterOrDigit(character) && character != '-') {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         private void setupDisguise(PreferenceScreen preferences) {

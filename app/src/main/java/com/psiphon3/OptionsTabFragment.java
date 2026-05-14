@@ -402,12 +402,73 @@ public class OptionsTabFragment extends PsiphonPreferenceFragmentCompat {
         SharedPreferences prefs = requireActivity()
                 .getSharedPreferences(getString(R.string.moreOptionsPreferencesName), MODE_PRIVATE);
 
+        // check if protocol selection has changed
+        String protocolSelectionNew =
+                prefs.getString(getString(R.string.protocolSelectionPreference), "auto");
+        String protocolSelectionCurrent =
+                multiProcessPreferences.getString(getString(R.string.protocolSelectionPreference), "auto");
+        if (!protocolSelectionCurrent.equals(protocolSelectionNew)) {
+            return true;
+        }
+
+        // check if CDN fronting custom IPs have changed
+        String cdnFrontingCustomIpListNew =
+                prefs.getString(getString(R.string.cdnFrontingCustomIpListPreference), "");
+        String cdnFrontingCustomIpListCurrent =
+                multiProcessPreferences.getString(getString(R.string.cdnFrontingCustomIpListPreference), "");
+        if (!cdnFrontingCustomIpListCurrent.equals(cdnFrontingCustomIpListNew)) {
+            return true;
+        }
+
+        // check if CDN fronting custom SNI has changed
+        String cdnFrontingCustomSniNew =
+                prefs.getString(getString(R.string.cdnFrontingCustomSniPreference), "");
+        String cdnFrontingCustomSniCurrent =
+                multiProcessPreferences.getString(getString(R.string.cdnFrontingCustomSniPreference), "");
+        if (!cdnFrontingCustomSniCurrent.equals(cdnFrontingCustomSniNew)) {
+            return true;
+        }
+
         // check if disable timeouts setting has changed
         boolean disableTimeoutsNewPreference =
                 prefs.getBoolean(getString(R.string.disableTimeoutsPreference), false);
         boolean disableTimeoutsCurrentPreference =
                 multiProcessPreferences.getBoolean(getString(R.string.disableTimeoutsPreference), false);
         if (disableTimeoutsCurrentPreference != disableTimeoutsNewPreference) {
+            return true;
+        }
+
+        // check if beast mode setting has changed
+        boolean beastModeNew =
+                prefs.getBoolean(getString(R.string.beastModePreference), true);
+        boolean beastModeCurrent =
+                multiProcessPreferences.getBoolean(getString(R.string.beastModePreference), true);
+        if (beastModeCurrent != beastModeNew) {
+            return true;
+        }
+
+        // check if conduit settings have changed
+        String conduitModeNew =
+                prefs.getString(getString(R.string.conduitModePreference), "auto");
+        String conduitModeCurrent =
+                multiProcessPreferences.getString(getString(R.string.conduitModePreference), "auto");
+        if (!conduitModeCurrent.equals(conduitModeNew)) {
+            return true;
+        }
+
+        String conduitTimeoutNew =
+                prefs.getString(getString(R.string.conduitTimeoutPreference), "180");
+        String conduitTimeoutCurrent =
+                multiProcessPreferences.getString(getString(R.string.conduitTimeoutPreference), "180");
+        if (!conduitTimeoutCurrent.equals(conduitTimeoutNew)) {
+            return true;
+        }
+
+        boolean rejectCensoredCountryProxiesNew =
+                prefs.getBoolean(getString(R.string.rejectCensoredCountryProxiesPreference), true);
+        boolean rejectCensoredCountryProxiesCurrent =
+                multiProcessPreferences.getBoolean(getString(R.string.rejectCensoredCountryProxiesPreference), true);
+        if (rejectCensoredCountryProxiesCurrent != rejectCensoredCountryProxiesNew) {
             return true;
         }
 
@@ -458,6 +519,8 @@ public class OptionsTabFragment extends PsiphonPreferenceFragmentCompat {
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.disableTimeoutsPreference), getString(R.string.disableTimeoutsPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.nfcBumpPreference), getString(R.string.nfcBumpPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.protocolSelectionPreference), getString(R.string.protocolSelectionPreference)),
+                new SharedPreferencesImport(requireContext(), prefName, getString(R.string.cdnFrontingCustomIpListPreference), getString(R.string.cdnFrontingCustomIpListPreference)),
+                new SharedPreferencesImport(requireContext(), prefName, getString(R.string.cdnFrontingCustomSniPreference), getString(R.string.cdnFrontingCustomSniPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.beastModePreference), getString(R.string.beastModePreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.conduitModePreference), getString(R.string.conduitModePreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.conduitTimeoutPreference), getString(R.string.conduitTimeoutPreference)),

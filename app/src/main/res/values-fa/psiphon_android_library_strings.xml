@@ -192,12 +192,23 @@
   <!-- Protocol selection preferences -->
   <string name="protocolSelectionPreferenceTitle">پروتکل اتصال</string>
   <string name="protocolSelectionPreferenceSummary">نحوه اتصال برنامه به سرورها را انتخاب کنید</string>
-  <string name="protocolSelectionSummaryAuto">خودکار - برنامه بهترین پروتکل را انتخاب می‌کند</string>
-  <string name="protocolSelectionSummaryDirect">مستقیم - اتصال مستقیم به سرورهای Psiphon</string>
+  <string name="protocolSelectionSummaryAuto">خودکار - برنامه بهترین پروتکل را انتخاب می‌کند، از جمله فرانتینگ CDN</string>
+  <string name="protocolSelectionSummaryDirect">مستقیم - پروتکل‌های مستقیم سرور و فرانتینگ CDN را امتحان می‌کند</string>
   <string name="protocolSelectionSummaryConduit">Conduit - اتصال از طریق رله‌های داوطلب (پروکسی‌های کشورهای سانسورشده مسدود هستند)</string>
+  <string name="protocolSelectionSummaryCdnFronting">فرانتینگ CDN - فقط از پروتکل meek پشت CDN استفاده می‌کند</string>
   <string name="protocol_auto">خودکار (پیشنهادی)</string>
   <string name="protocol_conduit">رله‌های Conduit</string>
+  <string name="protocol_cdn_fronting">فرانتینگ CDN</string>
   <string name="protocol_direct">اتصال مستقیم</string>
+  <string name="preference_category_cdn_fronting_title">فرانتینگ CDN</string>
+  <string name="preference_category_cdn_fronting_description">تنظیمات اختیاری و پیشرفته برای meek پشت CDN. این تنظیمات در حالت‌های خودکار، مستقیم و فرانتینگ CDN استفاده می‌شوند.</string>
+  <string name="cdnFrontingCustomIpListPreferenceTitle">ای‌پی‌های لبه CDN</string>
+  <string name="cdnFrontingCustomIpListPreferenceSummary">ای‌پی‌های اختیاری لبه CDN؛ با کاما، فاصله یا خط جدید جدا کنید</string>
+  <string name="cdnFrontingCustomIpListPreferenceSummaryConfigured">استفاده از %1$d ورودی ای‌پی اضافه برای فرانتینگ CDN</string>
+  <string name="cdnFrontingCustomSniPreferenceTitle">نام میزبان SNI برای CDN</string>
+  <string name="cdnFrontingCustomSniPreferenceSummary">SNI اختیاری برای ای‌پی‌های لبه CDN؛ برای استفاده از رفتار داخلی خالی بگذارید</string>
+  <string name="cdnFrontingCustomSniPreferenceSummaryConfigured">SNI در حال استفاده: %1$s</string>
+  <string name="cdnFrontingCustomSniPreferenceSummaryInvalid">نام میزبان نامعتبر است؛ SNI سفارشی نادیده گرفته می‌شود</string>
   <string name="beastModePreferenceTitle">حالت قدرتمند</string>
   <string name="beastModePreferenceSummaryOn">اتصال تهاجمی: همه پروتکل‌ها را روی هر سرور امتحان می‌کند</string>
   <string name="beastModePreferenceSummaryOff">اتصال عادی: پروتکل‌ها را به‌صورت تصادفی برای هر سرور انتخاب می‌کند</string>

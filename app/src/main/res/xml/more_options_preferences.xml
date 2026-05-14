@@ -70,6 +70,26 @@
             android:defaultValue="true" />
     </PreferenceCategory>
     <PreferenceCategory
+        android:key="cdnFrontingCategory"
+        android:title="@string/preference_category_cdn_fronting_title">
+        <Preference
+            android:key="cdnFrontingDescription"
+            android:summary="@string/preference_category_cdn_fronting_description"
+            android:selectable="false" />
+        <EditTextPreference
+            android:icon="@drawable/ic_cdn_edge"
+            android:key="@string/cdnFrontingCustomIpListPreference"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:summary="@string/cdnFrontingCustomIpListPreferenceSummary"
+            android:title="@string/cdnFrontingCustomIpListPreferenceTitle" />
+        <EditTextPreference
+            android:icon="@drawable/ic_tls_sni"
+            android:key="@string/cdnFrontingCustomSniPreference"
+            android:inputType="textUri|textNoSuggestions"
+            android:summary="@string/cdnFrontingCustomSniPreferenceSummary"
+            android:title="@string/cdnFrontingCustomSniPreferenceTitle" />
+    </PreferenceCategory>
+    <PreferenceCategory
         android:key="conduitCategory"
         android:title="@string/preference_category_conduit_title">
         <Preference

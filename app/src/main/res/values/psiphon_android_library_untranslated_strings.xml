@@ -54,6 +54,8 @@
     <string name="vpnServiceDataCollectionDisclosureAccepted" translatable="false">vpnServiceDataCollectionDisclosureAccepted</string>
     <string name="deviceLocationPrecisionParameter" translatable="false">deviceLocationPrecision</string>
     <string name="serviceRunningPreference" translatable="false">serviceRunningPreference</string>
+    <string name="cdnFrontingCustomIpListPreference" translatable="false">cdnFrontingCustomIpListPreference</string>
+    <string name="cdnFrontingCustomSniPreference" translatable="false">cdnFrontingCustomSniPreference</string>
 
     <string-array name="languages">
         <item>فارسی,fa</item>
@@ -62,14 +64,16 @@
 
     <string-array name="protocol_selection_entries" translatable="false">
         <item>@string/protocol_auto</item>
-        <item>@string/protocol_conduit</item>
         <item>@string/protocol_direct</item>
+        <item>@string/protocol_cdn_fronting</item>
+        <item>@string/protocol_conduit</item>
     </string-array>
 
     <string-array name="protocol_selection_values" translatable="false">
         <item>auto</item>
-        <item>conduit</item>
         <item>direct</item>
+        <item>cdn_fronting</item>
+        <item>conduit</item>
     </string-array>
 
     <string-array name="conduit_mode_entries" translatable="false">

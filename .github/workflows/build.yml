@@ -10,7 +10,7 @@ on:
       tunnel_core_ref:
         description: 'Tunnel-core branch/tag/commit to build AAR from'
         type: string
-        default: 'feat/inproxy-client-geoip-filtering'
+        default: 'shirokhorshid'
 
 permissions:
   contents: write
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout tunnel-core
         uses: actions/checkout@v4
         with:
-          repository: ssmirr/psiphon-tunnel-core
+          repository: shirokhorshid/psiphon-tunnel-core
           ref: ${{ inputs.tunnel_core_ref }}
           path: psiphon-tunnel-core
 
