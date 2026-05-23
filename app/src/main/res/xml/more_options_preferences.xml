@@ -91,7 +91,7 @@
         <EditTextPreference
             android:icon="@drawable/ic_tls_sni"
             android:key="@string/cdnFrontingCustomSniPreference"
-            android:inputType="textUri|textNoSuggestions"
+            android:inputType="textMultiLine|textNoSuggestions"
             android:summary="@string/cdnFrontingCustomSniPreferenceSummary"
             android:title="@string/cdnFrontingCustomSniPreferenceTitle" />
     </PreferenceCategory>

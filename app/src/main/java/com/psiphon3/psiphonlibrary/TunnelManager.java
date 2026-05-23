@@ -76,6 +76,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -143,7 +144,6 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
     public static final String DATA_UNSAFE_TRAFFIC_ACTION_URLS_LIST = "dataUnsafeTrafficActionUrls";
     public static final String DATA_NFC_CONNECTION_INFO_EXCHANGE = "dataNfcConnectionInfoExchange";
     static final String DATA_TUNNEL_STATE_SHARE_PROXY_ON_NETWORK = "shareProxyOnNetwork";
-    private static final int MAX_CUSTOM_CDN_FRONTING_IP_ADDRESSES = 32;
 
     void updateNotifications() {
         postServiceNotification(false, m_tunnelState.networkConnectionState);
@@ -1548,38 +1548,53 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
         }
     }
 
-    private static List<String> parseCdnFrontingCustomIpList(String customIpList) {
-        ArrayList<String> ipAddresses = new ArrayList<>();
+    private static List<String> parseCdnFrontingCustomIpCandidates(String customIpList) {
+        ArrayList<String> ipCandidates = new ArrayList<>();
         if (TextUtils.isEmpty(customIpList)) {
-            return ipAddresses;
+            return ipCandidates;
         }
 
         Set<String> seen = new HashSet<>();
         for (String entry : customIpList.split("[\\s,;]+")) {
-            String ipAddress = entry.trim();
-            if (ipAddress.isEmpty() || !isValidIPv4Address(ipAddress)) {
+            String ipCandidate = entry.trim();
+            if (ipCandidate.isEmpty() ||
+                    (!isValidIPv4Address(ipCandidate) && !isValidIPv4Cidr(ipCandidate))) {
                 continue;
             }
-            if (seen.add(ipAddress)) {
-                ipAddresses.add(ipAddress);
-                if (ipAddresses.size() >= MAX_CUSTOM_CDN_FRONTING_IP_ADDRESSES) {
-                    break;
-                }
+            if (seen.add(ipCandidate)) {
+                ipCandidates.add(ipCandidate);
             }
         }
 
-        return ipAddresses;
+        return ipCandidates;
+    }
+
+    private static List<String> parseCdnFrontingCustomSniList(String customSni) {
+        ArrayList<String> sniServerNames = new ArrayList<>();
+        if (TextUtils.isEmpty(customSni)) {
+            return sniServerNames;
+        }
+
+        Set<String> seen = new HashSet<>();
+        for (String entry : customSni.split("[\\s,;]+")) {
+            String sni = normalizeHostname(entry);
+            if (TextUtils.isEmpty(sni)) {
+                continue;
+            }
+            if (seen.add(sni)) {
+                sniServerNames.add(sni);
+            }
+        }
+
+        return sniServerNames;
     }
 
     private static String normalizeCdnFrontingCustomSni(String customSni) {
-        if (TextUtils.isEmpty(customSni)) {
+        List<String> sniServerNames = parseCdnFrontingCustomSniList(customSni);
+        if (sniServerNames.isEmpty()) {
             return "";
         }
-        String sni = customSni.trim();
-        if (!isValidHostname(sni)) {
-            return "";
-        }
-        return sni;
+        return sniServerNames.get(0);
     }
 
     private static boolean isValidIPv4Address(String ipAddress) {
@@ -1608,6 +1623,22 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
         }
 
         return true;
+    }
+
+    private static boolean isValidIPv4Cidr(String cidr) {
+        if (TextUtils.isEmpty(cidr)) {
+            return false;
+        }
+        String[] parts = cidr.split("/", -1);
+        if (parts.length != 2 || !isValidIPv4Address(parts[0])) {
+            return false;
+        }
+        try {
+            int prefix = Integer.parseInt(parts[1]);
+            return prefix >= 0 && prefix <= 32;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private static boolean isValidHostname(String hostname) {
@@ -1641,9 +1672,48 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
         return true;
     }
 
-    private static JSONArray makeCdnFrontingDialOverrides(
+    private static String normalizeHostname(String hostname) {
+        if (TextUtils.isEmpty(hostname)) {
+            return "";
+        }
+        String normalizedHostname = hostname.trim().toLowerCase(Locale.US);
+        if (normalizedHostname.endsWith(".")) {
+            normalizedHostname = normalizedHostname.substring(0, normalizedHostname.length() - 1);
+        }
+        if (!isValidHostname(normalizedHostname)) {
+            return "";
+        }
+        return normalizedHostname;
+    }
+
+    private static JSONArray makeStringArray(List<String> values) {
+        JSONArray array = new JSONArray();
+        for (String value : values) {
+            array.put(value);
+        }
+        return array;
+    }
+
+    private static JSONObject makeCdnFrontingScanSpec(
             String customIpList,
             String customSni) throws JSONException {
+        List<String> ipCandidates = parseCdnFrontingCustomIpCandidates(customIpList);
+        if (ipCandidates.isEmpty()) {
+            return null;
+        }
+
+        JSONObject spec = new JSONObject();
+        spec.put("IPCandidates", makeStringArray(ipCandidates));
+
+        List<String> sniServerNames = parseCdnFrontingCustomSniList(customSni);
+        if (!sniServerNames.isEmpty()) {
+            spec.put("SNIServerNames", makeStringArray(sniServerNames));
+        }
+
+        return spec;
+    }
+
+    private static JSONArray makeCdnFrontingDialOverrides(String customSni) throws JSONException {
         JSONArray overrides = new JSONArray();
         Set<String> edgeDialAddresses = new HashSet<>();
         String edgeSni = normalizeCdnFrontingCustomSni(customSni);
@@ -1677,13 +1747,6 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                 fastlyVerifyServerNames,
                 fastlyALPNProtocols));
 
-        int customIndex = 1;
-        for (String ipAddress : parseCdnFrontingCustomIpList(customIpList)) {
-            putEdgeCdnFrontingOverride(
-                    overrides, edgeDialAddresses, "edge-custom-" + customIndex, ipAddress, edgeSni);
-            customIndex++;
-        }
-
         putEdgeCdnFrontingOverride(
                 overrides, edgeDialAddresses, "edge-a-1", "23.215.0.206", edgeSni);
         putEdgeCdnFrontingOverride(
@@ -1710,9 +1773,16 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
             JSONObject json,
             Config tunnelConfig) throws JSONException {
         json.put("FrontedMeekDialOverrides", makeCdnFrontingDialOverrides(
-                tunnelConfig.cdnFrontingCustomIpList,
                 tunnelConfig.cdnFrontingCustomSni));
         json.put("FrontedMeekDialOverridesProbability", 1.0);
+        json.put("FrontedMeekCDNScanUseBuiltInSpec", true);
+
+        JSONObject scanSpec = makeCdnFrontingScanSpec(
+                tunnelConfig.cdnFrontingCustomIpList,
+                tunnelConfig.cdnFrontingCustomSni);
+        if (scanSpec != null) {
+            json.put("FrontedMeekCDNScanSpec", scanSpec);
+        }
     }
 
     private static JSONArray makeJsonArray(String[] values) {
@@ -2084,6 +2154,43 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                         String servers = matcher.group(2);
                         MyLog.i(R.string.beast_mode_connected, MyLog.Sensitivity.NOT_SENSITIVE, attempts, servers);
                     }
+                }
+
+                // CDN fronting scan notices
+                if (message.contains("cdn fronting scan active (mode:")) {
+                    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                            "\\(mode: ([^,]+), workers: (\\d+)(?:, candidates: \\d+, sni: \\d+)?\\)");
+                    java.util.regex.Matcher matcher = pattern.matcher(message);
+                    if (matcher.find()) {
+                        MyLog.i(R.string.cdn_fronting_scan_active, MyLog.Sensitivity.NOT_SENSITIVE,
+                                matcher.group(1), matcher.group(2));
+                        return;
+                    }
+                }
+                else if (message.contains("cdn fronting scan progress (attempts:") ||
+                        message.contains("cdn fronting scan progress (tried:")) {
+                    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                            "\\((?:attempts|tried): (\\d+)(?:, candidates: \\d+)?, working: (\\d+)\\)");
+                    java.util.regex.Matcher matcher = pattern.matcher(message);
+                    if (matcher.find()) {
+                        MyLog.i(R.string.cdn_fronting_scan_progress, MyLog.Sensitivity.NOT_SENSITIVE,
+                                matcher.group(1), matcher.group(2));
+                        return;
+                    }
+                }
+                else if (message.contains("cdn fronting scan exhausted (attempts:")) {
+                    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                            "\\(attempts: (\\d+)(?:, candidates: \\d+)?, working: (\\d+)\\)");
+                    java.util.regex.Matcher matcher = pattern.matcher(message);
+                    if (matcher.find()) {
+                        MyLog.i(R.string.cdn_fronting_scan_exhausted, MyLog.Sensitivity.NOT_SENSITIVE,
+                                matcher.group(1), matcher.group(2));
+                        return;
+                    }
+                }
+                else if (message.contains("cdn fronting scan found")) {
+                    MyLog.i(R.string.cdn_fronting_scan_found, MyLog.Sensitivity.NOT_SENSITIVE);
+                    return;
                 }
 
                 // Inproxy connection diagnostic messages

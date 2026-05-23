@@ -45,6 +45,8 @@ import androidx.preference.SwitchPreference;
 import com.psiphon3.MainActivityViewModel;
 import com.psiphon3.R;
 
+import java.util.Locale;
+
 public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompatActivity {
     public static final String INTENT_EXTRA_LANGUAGE_CHANGED = "com.psiphon3.psiphonlibrary.MoreOptionsPreferenceActivity.LANGUAGE_CHANGED";
 
@@ -167,9 +169,10 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
                         getString(R.string.cdnFrontingCustomSniPreference), "");
                 mCdnFrontingCustomSni.setText(customSni);
                 mCdnFrontingCustomSni.setOnBindEditTextListener(editText -> {
-                    editText.setSingleLine(true);
+                    editText.setSingleLine(false);
+                    editText.setMinLines(2);
                     editText.setInputType(InputType.TYPE_CLASS_TEXT
-                            | InputType.TYPE_TEXT_VARIATION_URI
+                            | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                             | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
                     editText.setSelection(editText.length());
                 });
@@ -321,7 +324,8 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
             }
             int count = 0;
             for (String entry : value.split("[\\s,;]+")) {
-                if (isValidIPv4Address(entry.trim())) {
+                String candidate = entry.trim();
+                if (isValidIPv4Address(candidate) || isValidIPv4Cidr(candidate)) {
                     count++;
                 }
             }
@@ -329,8 +333,8 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
         }
 
         private void updateCdnFrontingCustomSniSummary(EditTextPreference preference, String value) {
-            String sni = normalizeCdnFrontingCustomSni(value);
-            if (TextUtils.isEmpty(sni)) {
+            int count = countCdnFrontingSniEntries(value);
+            if (count == 0) {
                 if (TextUtils.isEmpty(value) || TextUtils.isEmpty(value.trim())) {
                     preference.setSummary(getString(R.string.cdnFrontingCustomSniPreferenceSummary));
                 } else {
@@ -338,19 +342,54 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
                 }
                 return;
             }
-            preference.setSummary(getString(
-                    R.string.cdnFrontingCustomSniPreferenceSummaryConfigured, sni));
+            if (count == 1) {
+                preference.setSummary(getString(
+                        R.string.cdnFrontingCustomSniPreferenceSummaryConfigured,
+                        firstCdnFrontingSniEntry(value)));
+            } else {
+                preference.setSummary(getString(
+                        R.string.cdnFrontingCustomSniPreferenceSummaryConfiguredMultiple, count));
+            }
         }
 
-        private String normalizeCdnFrontingCustomSni(String value) {
+        private int countCdnFrontingSniEntries(String value) {
+            if (TextUtils.isEmpty(value)) {
+                return 0;
+            }
+            int count = 0;
+            for (String entry : value.split("[\\s,;]+")) {
+                if (!TextUtils.isEmpty(normalizeHostname(entry))) {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private String firstCdnFrontingSniEntry(String value) {
             if (TextUtils.isEmpty(value)) {
                 return "";
             }
-            String sni = value.trim();
-            if (!isValidHostname(sni)) {
+            for (String entry : value.split("[\\s,;]+")) {
+                String sni = normalizeHostname(entry);
+                if (!TextUtils.isEmpty(sni)) {
+                    return sni;
+                }
+            }
+            return "";
+        }
+
+        private String normalizeHostname(String hostname) {
+            if (TextUtils.isEmpty(hostname)) {
                 return "";
             }
-            return sni;
+            String normalizedHostname = hostname.trim().toLowerCase(Locale.US);
+            if (normalizedHostname.endsWith(".")) {
+                normalizedHostname = normalizedHostname.substring(0, normalizedHostname.length() - 1);
+            }
+            if (!isValidHostname(normalizedHostname)) {
+                return "";
+            }
+            return normalizedHostname;
         }
 
         private boolean isValidIPv4Address(String ipAddress) {
@@ -382,6 +421,22 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
             }
 
             return true;
+        }
+
+        private boolean isValidIPv4Cidr(String cidr) {
+            if (TextUtils.isEmpty(cidr)) {
+                return false;
+            }
+            String[] parts = cidr.split("/", -1);
+            if (parts.length != 2 || !isValidIPv4Address(parts[0])) {
+                return false;
+            }
+            try {
+                int prefix = Integer.parseInt(parts[1]);
+                return prefix >= 0 && prefix <= 32;
+            } catch (NumberFormatException e) {
+                return false;
+            }
         }
 
         private boolean isValidHostname(String hostname) {
