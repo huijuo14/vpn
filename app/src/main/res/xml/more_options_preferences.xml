@@ -39,6 +39,12 @@
             android:title="@string/disableTimeoutsPreferenceTitle"
             android:summary="@string/disableTimeoutsPreferenceSummary" />
         <CheckBoxPreference
+            android:icon="@drawable/baseline_info_white_24"
+            android:defaultValue="true"
+            android:key="@string/autoOpenHomepagePreference"
+            android:title="@string/autoOpenHomepagePreferenceTitle"
+            android:summary="@string/autoOpenHomepagePreferenceSummary" />
+        <CheckBoxPreference
             android:icon="@drawable/baseline_system_update_white_24"
             android:key="@string/downloadWifiOnlyPreference"
             android:title="@string/downloadWiFiOnlyPreferenceTitle"

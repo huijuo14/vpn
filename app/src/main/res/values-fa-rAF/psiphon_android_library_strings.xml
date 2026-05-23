@@ -201,6 +201,8 @@
   <string name="cdnFrontingCustomSniPreferenceSummary">SNI اختیاری برای ای‌پی‌های لبه CDN؛ برای استفاده از رفتار داخلی خالی بگذارید</string>
   <string name="cdnFrontingCustomSniPreferenceSummaryConfigured">SNI در حال استفاده: %1$s</string>
   <string name="cdnFrontingCustomSniPreferenceSummaryInvalid">نام میزبان نامعتبر است؛ SNI سفارشی نادیده گرفته می‌شود</string>
+  <string name="autoOpenHomepagePreferenceTitle">باز کردن وب‌سایت پس از اتصال</string>
+  <string name="autoOpenHomepagePreferenceSummary">پس از اتصال تونل، وب‌سایت اتصال به‌صورت خودکار باز شود</string>
   <string name="beastModePreferenceTitle">حالت قدرتمند</string>
   <string name="beastModePreferenceSummaryOn">اتصال تهاجمی: همه پروتکل‌ها را روی هر سرور امتحان می‌کند</string>
   <string name="beastModePreferenceSummaryOff">اتصال عادی: پروتکل‌ها را به‌صورت تصادفی برای هر سرور انتخاب می‌کند</string>

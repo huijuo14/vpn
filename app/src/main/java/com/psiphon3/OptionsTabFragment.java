@@ -517,6 +517,7 @@ public class OptionsTabFragment extends PsiphonPreferenceFragmentCompat {
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.downloadWifiOnlyPreference), getString(R.string.downloadWifiOnlyPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.unsafeTrafficAlertsPreference), getString(R.string.unsafeTrafficAlertsPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.disableTimeoutsPreference), getString(R.string.disableTimeoutsPreference)),
+                new SharedPreferencesImport(requireContext(), prefName, getString(R.string.autoOpenHomepagePreference), getString(R.string.autoOpenHomepagePreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.nfcBumpPreference), getString(R.string.nfcBumpPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.protocolSelectionPreference), getString(R.string.protocolSelectionPreference)),
                 new SharedPreferencesImport(requireContext(), prefName, getString(R.string.cdnFrontingCustomIpListPreference), getString(R.string.cdnFrontingCustomIpListPreference)),

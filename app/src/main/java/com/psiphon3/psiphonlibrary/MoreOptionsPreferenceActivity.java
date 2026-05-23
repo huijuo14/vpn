@@ -106,6 +106,10 @@ public class MoreOptionsPreferenceActivity extends LocalizedActivities.AppCompat
                     (CheckBoxPreference) preferences.findPreference(getString(R.string.disableTimeoutsPreference));
             disableTimeoutsCheckBox.setChecked(preferenceGetter.getBoolean(getString(R.string.disableTimeoutsPreference), false));
 
+            CheckBoxPreference autoOpenHomepageCheckBox =
+                    (CheckBoxPreference) preferences.findPreference(getString(R.string.autoOpenHomepagePreference));
+            autoOpenHomepageCheckBox.setChecked(preferenceGetter.getBoolean(getString(R.string.autoOpenHomepagePreference), true));
+
             // TODO: Check if there are any VPN exclusions enabled and inform the user via pref summary?
             //  Maybe even disable the setting if that's the case? Whatever it is do the same when
             //  the 'unsafe traffic' alerts preference is on and user enables VPN exclusions in

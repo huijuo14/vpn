@@ -31,6 +31,7 @@
     <string name="useProxyDomainPreference">useProxyDomainPreference</string>
     <string name="downloadWifiOnlyPreference">downloadWifiOnlyPreference</string>
     <string name="disableTimeoutsPreference">disableTimeoutsPreference</string>
+    <string name="autoOpenHomepagePreference">autoOpenHomepagePreference</string>
     <string name="forceConduitPreference" translatable="false">forceConduitPreference</string>
     <string name="protocolSelectionPreference" translatable="false">protocolSelectionPreference</string>
     <string name="beastModePreference" translatable="false">beastModePreference</string>

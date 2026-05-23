@@ -732,6 +732,10 @@ public class MainActivity extends LocalizedActivities.AppCompatActivity {
         }
     }
 
+    private boolean shouldAutoOpenHomepage() {
+        return multiProcessPreferences.getBoolean(getString(R.string.autoOpenHomepagePreference), true);
+    }
+
     private void HandleCurrentIntent(Intent intent) {
         if (intent == null || intent.getAction() == null) {
             return;
@@ -772,7 +776,9 @@ public class MainActivity extends LocalizedActivities.AppCompatActivity {
                             vpnMode = VpnAppsUtils.VpnAppsExclusionSetting.ALL_APPS;
                         }
                         VpnAppsUtils.AppTunneledChecker isAppTunneled = VpnAppsUtils.createAppTunneledChecker(vpnMode, vpnApps);
-                        displayBrowser(this, url, isAppTunneled);
+                        if (shouldAutoOpenHomepage()) {
+                            displayBrowser(this, url, isAppTunneled);
+                        }
                     } else {
                         selectTabByTag("home");
                     }
