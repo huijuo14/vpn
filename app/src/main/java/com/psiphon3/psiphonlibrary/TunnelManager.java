@@ -2189,6 +2189,21 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                     }
                 }
                 else if (message.contains("cdn fronting scan found")) {
+                    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                            "\\(ip: ([^,]+), sni: ([^)]+)\\)");
+                    java.util.regex.Matcher matcher = pattern.matcher(message);
+                    if (matcher.find()) {
+                        String ipAddress = matcher.group(1)
+                                .replace("\\.", ".")
+                                .replace("\\:", ":");
+                        String sniServerName = matcher.group(2);
+                        if ("none".equals(sniServerName)) {
+                            sniServerName = getContext().getString(R.string.cdn_fronting_scan_no_sni);
+                        }
+                        MyLog.i(R.string.cdn_fronting_scan_found_with_route, MyLog.Sensitivity.SENSITIVE_FORMAT_ARGS,
+                                ipAddress, sniServerName);
+                        return;
+                    }
                     MyLog.i(R.string.cdn_fronting_scan_found, MyLog.Sensitivity.NOT_SENSITIVE);
                     return;
                 }

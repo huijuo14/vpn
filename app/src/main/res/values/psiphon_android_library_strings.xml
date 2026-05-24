@@ -123,6 +123,8 @@
     <string name="cdn_fronting_scan_progress">CDN scan: %1$s attempts, working: %2$s</string>
     <string name="cdn_fronting_scan_exhausted">CDN scan finished after %1$s attempts, working: %2$s</string>
     <string name="cdn_fronting_scan_found">CDN scan found a working route</string>
+    <string name="cdn_fronting_scan_found_with_route">CDN scan found %1$s + %2$s</string>
+    <string name="cdn_fronting_scan_no_sni">no SNI</string>
     <string name="conduit_proxy_connected">Tunnel connected via Conduit (protocol: %1$s, country: %2$s)</string>
     <string name="conduit_proxy_connected_no_country">Tunnel connected via Conduit (protocol: %s)</string>
     <string name="conduit_diag">[Conduit] %s</string>

@@ -211,6 +211,8 @@
   <string name="cdn_fronting_scan_progress">اسکن CDN: %1$s تلاش، فعال: %2$s</string>
   <string name="cdn_fronting_scan_exhausted">اسکن CDN پس از %1$s تلاش تمام شد، فعال: %2$s</string>
   <string name="cdn_fronting_scan_found">اسکن CDN یک مسیر کارآمد پیدا کرد</string>
+  <string name="cdn_fronting_scan_found_with_route">اسکن CDN %1$s + %2$s را پیدا کرد</string>
+  <string name="cdn_fronting_scan_no_sni">بدون SNI</string>
 
   <!-- Reject censored country proxies -->
   <string name="rejectCensoredCountryProxiesPreferenceTitle">رد پروکسی‌های کشورهای سانسورشده</string>
