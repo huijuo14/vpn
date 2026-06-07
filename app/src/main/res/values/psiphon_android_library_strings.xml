@@ -17,6 +17,11 @@
     <!-- Name of the notification channel for 'Psiphon crashed' notifications, note that 'Crashes' is a plural noun. -->
     <string name="psiphon_native_crash_notification_channel_name">Shir o Khorshid Crashes</string>
     <string name="vpn_service_running">VPN service running</string>
+    <string name="internal_tunnel_address_selected">Tunnel local interface address selected: %s</string>
+    <string name="internal_tunnel_gateway">Internal tunnel gateway: %s</string>
+    <string name="internal_tunnel_candidate_skipped">Skipped internal tunnel candidate %1$s because %2$s has overlapping address %3$s</string>
+    <string name="internal_tunnel_link_local_fallback">Internal tunnel is using the 169.254 link-local fallback address</string>
+    <string name="internal_tunnel_interface_address_ignored">Ignoring interface %1$s address %2$s with invalid prefix length %3$d</string>
     <string name="vpn_service_revoked">VPN service revoked</string>
     <string name="current_network_type">Current network: %s</string>
     <!-- Do not translate or transliterate "Psiphon" -->

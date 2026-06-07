@@ -16,6 +16,11 @@
   <!--Name of the notification channel for 'Psiphon crashed' notifications, note that 'Crashes' is a plural noun.-->
   <string name="psiphon_native_crash_notification_channel_name">خرابی‌های شیر و خورشید</string>
   <string name="vpn_service_running">سرویس وی پی ان فعال است</string>
+  <string name="internal_tunnel_address_selected">آدرس رابط محلی تونل انتخاب شد: %s</string>
+  <string name="internal_tunnel_gateway">دروازه داخلی تونل: %s</string>
+  <string name="internal_tunnel_candidate_skipped">گزینه داخلی تونل %1$s رد شد چون %2$s آدرس هم‌پوشان %3$s دارد</string>
+  <string name="internal_tunnel_link_local_fallback">تونل داخلی از آدرس پشتیبان link-local 169.254 استفاده می‌کند</string>
+  <string name="internal_tunnel_interface_address_ignored">آدرس %2$s روی رابط %1$s به دلیل طول پیشوند نامعتبر %3$d نادیده گرفته شد</string>
   <string name="vpn_service_revoked">سرویس وی پی ان لغو شد</string>
   <string name="current_network_type">شبکه کنونی: %s</string>
   <!--Do not translate or transliterate "Psiphon"-->

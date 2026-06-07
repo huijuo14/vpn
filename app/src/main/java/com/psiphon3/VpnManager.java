@@ -30,16 +30,15 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -123,16 +122,60 @@ public class VpnManager {
         }
     }
 
+    private static class ExistingInterfaceAddress {
+        final String mInterfaceName;
+        final String mIpAddress;
+        final int mPrefixLength;
+
+        ExistingInterfaceAddress(String interfaceName, String ipAddress, int prefixLength) {
+            mInterfaceName = interfaceName;
+            mIpAddress = ipAddress;
+            mPrefixLength = prefixLength;
+        }
+    }
+
+    // Ordered internal tunnel address candidates. Use small /24 subnets so that an unrelated
+    // address elsewhere in 10/8, 172.16/12, or 192.168/16 does not unnecessarily force fallback
+    // to the 169.254/16 link-local range.
+    private static final PrivateAddress[] PRIVATE_ADDRESS_CANDIDATES = {
+            new PrivateAddress("10.250.250.1", "10.250.250.0", 24, "10.250.250.2"),
+            new PrivateAddress("10.111.222.1", "10.111.222.0", 24, "10.111.222.2"),
+            new PrivateAddress("10.200.200.1", "10.200.200.0", 24, "10.200.200.2"),
+            new PrivateAddress("10.255.250.1", "10.255.250.0", 24, "10.255.250.2"),
+            new PrivateAddress("172.29.250.1", "172.29.250.0", 24, "172.29.250.2"),
+            new PrivateAddress("172.30.250.1", "172.30.250.0", 24, "172.30.250.2"),
+            new PrivateAddress("172.31.250.1", "172.31.250.0", 24, "172.31.250.2"),
+            new PrivateAddress("192.168.250.1", "192.168.250.0", 24, "192.168.250.2"),
+            new PrivateAddress("192.168.251.1", "192.168.251.0", 24, "192.168.251.2"),
+            new PrivateAddress("192.168.252.1", "192.168.252.0", 24, "192.168.252.2"),
+            new PrivateAddress("198.18.0.1", "198.18.0.0", 24, "198.18.0.2"),
+            new PrivateAddress("198.19.0.1", "198.19.0.0", 24, "198.19.0.2"),
+            new PrivateAddress("169.254.1.1", "169.254.1.0", 24, "169.254.1.2"),
+    };
+
     private static PrivateAddress selectPrivateAddress() throws IllegalStateException {
-        // Select one of 10.0.0.1, 172.16.0.1, 192.168.0.1, or 169.254.1.1 depending on
-        // which private address range isn't in use.
+        List<ExistingInterfaceAddress> existingAddresses = getExistingInterfaceAddresses();
 
-        Map<String, PrivateAddress> candidates = new HashMap<>();
-        candidates.put("10", new PrivateAddress("10.0.0.1", "10.0.0.0", 8, "10.0.0.2"));
-        candidates.put("172", new PrivateAddress("172.16.0.1", "172.16.0.0", 12, "172.16.0.2"));
-        candidates.put("192", new PrivateAddress("192.168.0.1", "192.168.0.0", 16, "192.168.0.2"));
-        candidates.put("169", new PrivateAddress("169.254.1.1", "169.254.1.0", 24, "169.254.1.2"));
+        for (PrivateAddress candidate : PRIVATE_ADDRESS_CANDIDATES) {
+            ExistingInterfaceAddress conflictingAddress =
+                    findConflictingInterfaceAddress(candidate, existingAddresses);
+            if (conflictingAddress == null) {
+                logSelectedPrivateAddress(candidate);
+                return candidate;
+            }
 
+            MyLog.i(R.string.internal_tunnel_candidate_skipped,
+                    MyLog.Sensitivity.SENSITIVE_FORMAT_ARGS,
+                    formatSubnet(candidate),
+                    conflictingAddress.mInterfaceName,
+                    conflictingAddress.mIpAddress + "/" + conflictingAddress.mPrefixLength);
+        }
+
+        throw new IllegalStateException("No internal tunnel address available");
+    }
+
+    private static List<ExistingInterfaceAddress> getExistingInterfaceAddresses()
+            throws IllegalStateException {
         Enumeration<NetworkInterface> netInterfaces;
         try {
             netInterfaces = NetworkInterface.getNetworkInterfaces();
@@ -144,32 +187,62 @@ public class VpnManager {
             throw new IllegalStateException("No network interfaces found");
         }
 
+        List<ExistingInterfaceAddress> existingAddresses = new ArrayList<>();
         for (NetworkInterface netInterface : Collections.list(netInterfaces)) {
-            for (InetAddress inetAddress : Collections.list(netInterface.getInetAddresses())) {
+            for (InterfaceAddress interfaceAddress : netInterface.getInterfaceAddresses()) {
+                InetAddress inetAddress = interfaceAddress.getAddress();
                 if (inetAddress instanceof Inet4Address) {
                     String ipAddress = inetAddress.getHostAddress();
                     if (ipAddress == null) {
                         continue;
                     }
-                    if (ipAddress.startsWith("10.")) {
-                        candidates.remove("10");
-                    } else if (
-                            ipAddress.length() >= 6 &&
-                                    ipAddress.substring(0, 6).compareTo("172.16") >= 0 &&
-                                    ipAddress.substring(0, 6).compareTo("172.31") <= 0) {
-                        candidates.remove("172");
-                    } else if (ipAddress.startsWith("192.168")) {
-                        candidates.remove("192");
+                    int prefixLength = interfaceAddress.getNetworkPrefixLength();
+                    if (prefixLength < 0 || prefixLength > 32) {
+                        MyLog.w(R.string.internal_tunnel_interface_address_ignored,
+                                MyLog.Sensitivity.SENSITIVE_FORMAT_ARGS,
+                                netInterface.getName(),
+                                ipAddress,
+                                prefixLength);
+                        continue;
                     }
+                    existingAddresses.add(new ExistingInterfaceAddress(
+                            netInterface.getName(), ipAddress, prefixLength));
                 }
             }
         }
+        return existingAddresses;
+    }
 
-        if (candidates.size() > 0) {
-            return candidates.values().iterator().next();
+    private static ExistingInterfaceAddress findConflictingInterfaceAddress(
+            PrivateAddress candidate,
+            List<ExistingInterfaceAddress> existingAddresses) {
+        for (ExistingInterfaceAddress existingAddress : existingAddresses) {
+            if (cidrBlocksOverlap(
+                    ipToLong(candidate.mSubnet),
+                    candidate.mPrefixLength,
+                    ipToLong(existingAddress.mIpAddress),
+                    existingAddress.mPrefixLength)) {
+                return existingAddress;
+            }
         }
+        return null;
+    }
 
-        throw new IllegalStateException("No private address available");
+    private static void logSelectedPrivateAddress(PrivateAddress privateAddress) {
+        MyLog.i(R.string.internal_tunnel_address_selected,
+                MyLog.Sensitivity.SENSITIVE_FORMAT_ARGS,
+                privateAddress.mIpAddress + "/" + privateAddress.mPrefixLength);
+        MyLog.i(R.string.internal_tunnel_gateway,
+                MyLog.Sensitivity.SENSITIVE_FORMAT_ARGS,
+                privateAddress.mRouter);
+        if (privateAddress.mIpAddress.startsWith("169.254.")) {
+            MyLog.w(R.string.internal_tunnel_link_local_fallback,
+                    MyLog.Sensitivity.NOT_SENSITIVE);
+        }
+    }
+
+    private static String formatSubnet(PrivateAddress privateAddress) {
+        return privateAddress.mSubnet + "/" + privateAddress.mPrefixLength;
     }
 
     // Set whether LAN proxy sharing is enabled. When enabled, VPN routes will exclude
@@ -339,6 +412,19 @@ public class VpnManager {
                 splitExcluding(result, child[0], childPrefix, exclStart, exclEnd);
             }
         }
+    }
+
+    private static boolean cidrBlocksOverlap(long firstIp, int firstPrefix,
+                                             long secondIp, int secondPrefix) {
+        long firstMask = prefixToMask(firstPrefix);
+        long firstStart = firstIp & firstMask;
+        long firstEnd = firstStart | (~firstMask & 0xFFFFFFFFL);
+
+        long secondMask = prefixToMask(secondPrefix);
+        long secondStart = secondIp & secondMask;
+        long secondEnd = secondStart | (~secondMask & 0xFFFFFFFFL);
+
+        return firstStart <= secondEnd && secondStart <= firstEnd;
     }
 
     /** Convert a prefix length (0-32) to a 32-bit mask as an unsigned long. */
