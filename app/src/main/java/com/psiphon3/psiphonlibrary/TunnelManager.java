@@ -372,16 +372,6 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                         m_isRoutingThroughTunnelPublishRelay.accept(Boolean.TRUE);
                         // Do not emit downstream if we are just started routing.
                         return Observable.empty();
-                            // Emit CONNECTING and start waiting for an activity to bind
-                            return waitSendIntentAndRouteThroughTunnelCompletable(this::sendHandshakeIntent)
-                                    .<TunnelState.ConnectionData.NetworkConnectionState>toObservable()
-                                    .startWith(TunnelState.ConnectionData.NetworkConnectionState.CONNECTING);
-                        }
-                        // No intents to send, just route through tunnel.
-                        m_vpnManager.routeThroughTunnel(m_tunnel.getLocalSocksProxyPort());
-                        m_isRoutingThroughTunnelPublishRelay.accept(Boolean.TRUE);
-                        // Do not emit downstream if we are just started routing.
-                        return Observable.empty();
                     }
                     return Observable.just(networkConnectionState);
                 })
@@ -397,11 +387,10 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                 .subscribe();
     }
 
-        private Completable waitSendIntentAndRouteThroughTunnelCompletable(Runnable runnable) {
+    private Completable waitSendIntentAndRouteThroughTunnelCompletable(Runnable runnable) {
+        // NOTE: No longer used - routing happens immediately in connectionStatusUpdaterDisposable
         return Completable.complete();
     }
-
-    private boolean canSendIntentToActivity
 
     private boolean canSendIntentToActivity() {
         return Build.VERSION.SDK_INT < 29 || pingForActivity();
