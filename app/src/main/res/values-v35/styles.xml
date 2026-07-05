@@ -19,5 +19,5 @@
         <item name="android:statusBarColor">@color/amoled_background</item>
         <item name="android:navigationBarColor">@color/amoled_background</item>
     </style>
-    </style>
+
 </resources>
