@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Psiphon" parent="Theme.AppCompat.NoActionBar">
+    <style name="Theme.Psiphon" parent="Theme.AppCompat">
         <!-- AMOLED pitch black theme -->
         <item name="android:windowBackground">@color/amoled_background</item>
         <item name="android:colorBackground">@color/amoled_background</item>
@@ -9,11 +9,11 @@
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
         <item name="colorAccent">@color/accent_color</item>
-        <item name="colorPrimary">@color/amoled_surface</item>
+        <item name="colorPrimary">@color/amoled_background</item>
         <item name="colorPrimaryDark">@color/amoled_background</item>
         <!-- workaround for opting out of edge-to-edge enforcement, see v35+ specific styles -->
     </style>
-    <style name="Theme.Psiphon.NoActionBar" parent="Theme.Psiphon">
+    <style name="Theme.Psiphon.NoActionBar" parent="Theme.AppCompat.NoActionBar">
     </style>
     <style name="Theme.DialogAlert" parent="Theme.AppCompat.Dialog.Alert">
         <item name="android:windowBackground">@color/amoled_surface</item>

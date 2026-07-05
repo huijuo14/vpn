@@ -22,7 +22,7 @@
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <View 
-        android:background="#ffffff"
+        android:background="@color/amoled_surface"
         android:layout_width="fill_parent"
         android:layout_height="1dip"/>
 
@@ -85,7 +85,7 @@
     </LinearLayout>
 
     <View 
-        android:background="#ffffff"
+        android:background="@color/amoled_surface"
         android:layout_width="fill_parent"
         android:layout_height="1dip"/>
 
