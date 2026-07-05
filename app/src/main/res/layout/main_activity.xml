@@ -28,8 +28,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
-
+        android:orientation="vertical"
+        android:background="@color/amoled_background">
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/main_toolbar"
             android:layout_width="match_parent"
@@ -80,12 +80,23 @@
                 <com.psiphon3.PsiphonTabLayout
                     android:id="@+id/main_activity_tablayout"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:background="@color/amoled_background"
+                    app:tabBackground="@color/amoled_background"
+                    app:tabIndicatorColor="@color/accent_color"
+                    app:tabRippleColor="@color/amoled_background"
+                    app:tabIndicatorHeight="3dp"
+                    app:tabMode="fixed"
+                    app:tabGravity="fill"
+                    app:tabTextAppearance="@style/TabTextStyle"
+                    app:tabSelectedTextColor="@color/accent_color"
+                    app:tabTextColor="@color/text_secondary" />
 
                 <androidx.viewpager.widget.ViewPager
                     android:id="@+id/tabs_view_pager"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:background="@color/amoled_background" />
             </LinearLayout>
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -105,7 +116,8 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:background="@color/amoled_background">
 
             <LinearLayout
                 android:id="@+id/buttonPanel"
