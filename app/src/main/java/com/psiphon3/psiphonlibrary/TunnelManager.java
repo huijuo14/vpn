@@ -1078,6 +1078,9 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
     };
 
     private static final String[] CONDUIT_TUNNEL_PROTOCOLS = {
+            "INPROXY-WEBRTC-QUIC-OSSH",
+            "INPROXY-WEBRTC-FRONTED-MEEK-QUIC-OSSH",
+            "INPROXY-WEBRTC-SHADOWSOCKS-OSSH",
             "INPROXY-WEBRTC-SSH",
             "INPROXY-WEBRTC-OSSH",
             "INPROXY-WEBRTC-TLS-OSSH",
@@ -1086,9 +1089,6 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
             "INPROXY-WEBRTC-UNFRONTED-MEEK-SESSION-TICKET-OSSH",
             "INPROXY-WEBRTC-FRONTED-MEEK-OSSH",
             "INPROXY-WEBRTC-FRONTED-MEEK-HTTP-OSSH",
-            "INPROXY-WEBRTC-QUIC-OSSH",
-            "INPROXY-WEBRTC-FRONTED-MEEK-QUIC-OSSH",
-            "INPROXY-WEBRTC-SHADOWSOCKS-OSSH",
     };
 
     private static final String[] CDN_FRONTING_TUNNEL_PROTOCOLS = {
