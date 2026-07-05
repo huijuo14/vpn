@@ -1988,6 +1988,9 @@ public class TunnelManager implements PsiphonTunnel.HostService, VpnManager.VpnS
                 json.put("FragmentorMinTotalBytes", 1000);
                 json.put("FragmentorMaxTotalBytes", 2000);
 
+                        // Faster parallel probing: probe more servers at once
+                json.put("ConnectionWorkerCount", 20);
+
                 json.put("DNSResolverAlternateServers", new JSONArray("[\"1.1.1.1\", \"1.0.0.1\", \"8.8.8.8\", \"8.8.4.4\"]"));
 
             if (!TextUtils.isEmpty(tunnelConfig.deviceLocation)) {

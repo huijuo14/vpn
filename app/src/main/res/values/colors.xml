@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="amoled_background">#FF000000</color>
-    <color name="amoled_surface">#FF121212</color>
-    <color name="amoled_surface_light">#FF1E1E1E</color>
+    <color name="amoled_surface">#FF000000</color>
+    <color name="amoled_surface_light">#FF000000</color>
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_secondary">#FFB3B3B3</color>
     <color name="accent_color">#FF4FC3F7</color>
